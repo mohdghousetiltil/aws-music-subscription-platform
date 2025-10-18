@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Music App | Main Page</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      background: #f0f2f5;
+    }
+    header {
+      background-color: #2a5298;
+      color: white;
+      padding: 1em;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h2 {
+      margin: 0;
+    }
+    .section {
+      padding: 20px;
+    }
+    .section h3 {
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 5px;
+    }
+    .music-card {
+      background: white;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .music-info {
+      flex-grow: 1;
+    }
+    .music-info p {
+      margin: 3px 0;
+    }
+    img {
+      max-width: 100px;
+      border-radius: 5px;
+      margin-right: 10px;
+    }
+    form input, form button {
+      padding: 10px;
+      margin: 5px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    .logout {
+      color: white;
+      text-decoration: none;
+      background: #c0392b;
+      padding: 8px 12px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h2>Welcome, <span id="username">User</span></h2>
+    <a href="Loginpage.html" class="logout">Logout</a>
+  </header>
+
+  <div class="section" id="subscription-area">
+    <h3>Your Subscriptions</h3>
+    <!-- Subscribed songs will appear here -->
+  </div>
+
+  <div class="section" id="query-area">
+    <h3>Search Music</h3>
+    <form id="query-form">
+      <input type="text" name="title" placeholder="Title">
+      <input type="text" name="artist" placeholder="Artist">
+      <input type="text" name="album" placeholder="Album">
+      <input type="text" name="year" placeholder="Year">
+      <button type="submit">Query</button>
+    </form>
+    <div id="query-results"></div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+	const username = urlParams.get('username') || 'User';
+	const email = urlParams.get('email');  // ✅ capture email from query param
+
+	document.getElementById('username').textContent = username;
+
+
+    document.getElementById('query-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const formData = new FormData(this);
+      const queryParams = {};
+      for (const [key, value] of formData.entries()) {
+        if (value.trim()) {
+          queryParams[key] = value.trim();
+        }
+      }
+
+      if (Object.keys(queryParams).length === 0) {
+        alert("Please fill in at least one search field.");
+        return;
+      }
+
+      fetch('https://0qc0cwrzr6.execute-api.us-east-1.amazonaws.com/Prod/query-music', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(queryParams)
+      })
+      .then(res => res.json())
+      .then(data => {
+        const resultsDiv = document.getElementById('query-results');
+        resultsDiv.innerHTML = '';
+
+        if (!Array.isArray(data) || data.length === 0) {
+          resultsDiv.innerHTML = "<p>No result is retrieved. Please query again.</p>";
+          return;
+        }
+
+        data.forEach(song => {
+          const card = document.createElement('div');
+          card.className = 'music-card';
+
+          card.innerHTML = `
+				  <div class="music-info">
+					<p><strong>Title:</strong> ${song.title}</p>
+					<p><strong>Artist:</strong> ${song.artist}</p>
+					<p><strong>Album:</strong> ${song.album}</p>
+					<p><strong>Year:</strong> ${song.year}</p>
+				  </div>
+				  <img src="${song.image_url || 'https://via.placeholder.com/100'}" alt="Artist Image">
+				  <button class="subscribe-btn">Subscribe</button>
+				`;
+
+				const button = card.querySelector('.subscribe-btn');
+				button.addEventListener('click', () => {
+				  subscribeToSong(song.title, song.artist, song.album, song.year, song.image_url);
+				});
+
+
+          resultsDiv.appendChild(card);
+        });
+      })
+      .catch(error => {
+        console.error("Error fetching query results:", error);
+        alert("An error occurred while querying.");
+      });
+    });
+
+    function subscribeToSong(title, artist, album, year, image_url) {
+	  const email = new URLSearchParams(window.location.search).get("email");
+
+	  //Check if already subscribed
+	  const alreadySubscribed = currentSubscriptions.some(song =>
+		song.title === title && song.artist === artist
+	  );
+
+	  if (alreadySubscribed) {
+		alert(`You are already subscribed to "${title}" by ${artist}.`);
+		return;
+	  }
+
+	  // Proceed to subscribe
+	  fetch("https://0qc0cwrzr6.execute-api.us-east-1.amazonaws.com/Prod/subscribe", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+		  email,
+		  title,
+		  artist,
+		  album,
+		  year,
+		  artist_image_url: image_url
+		})
+	  })
+		.then(res => res.json())
+		.then(result => {
+		  if (result.message === "Subscription added") {
+			alert(`✅ Subscribed to "${title}" by ${artist}`);
+			loadSubscriptions(); // reload updated list
+		  } else {
+			alert("❌ Failed to subscribe.");
+		  }
+		})
+		.catch(error => {
+		  console.error("Subscription error:", error);
+		  alert("❌ An error occurred while subscribing.");
+		});
+	}
+
+
+
+
+
+    function loadSubscriptions() {
+			  if (!email) {
+				console.error("❌ Email not available.");
+				return;
+			  }
+
+			  fetch(`https://0qc0cwrzr6.execute-api.us-east-1.amazonaws.com/Prod/load-subscriptions?email=${encodeURIComponent(email)}`)
+				.then(res => res.json())
+				.then(data => {
+				  currentSubscriptions = data; // ✅ Save current subscriptions for later check
+
+				  const subDiv = document.getElementById('subscription-area');
+				  subDiv.innerHTML = "<h3>Your Subscriptions</h3>";
+
+				  if (!Array.isArray(data) || data.length === 0) {
+					subDiv.innerHTML += "<p style='color:red;'>No Music to Show Here</p>";
+					return;
+				  }
+
+				  data.forEach(song => {
+					const card = document.createElement('div');
+					card.className = 'music-card';
+
+					card.innerHTML = `
+					  <div class="music-info">
+						<p><strong>Title:</strong> ${song.title}</p>
+						<p><strong>Artist:</strong> ${song.artist}</p>
+						<p><strong>Album:</strong> ${song.album}</p>
+						<p><strong>Year:</strong> ${song.year}</p>
+					  </div>
+					  <img src="${song.artist_image_url || 'https://via.placeholder.com/100'}" alt="Artist Image">
+					  <button onclick="removeSubscription('${song.title}')">Remove</button>
+					`;
+					const removeBtn = card.querySelector('.remove-btn');
+					  if (removeBtn) {
+						removeBtn.addEventListener("click", () => {
+						  const titleToRemove = removeBtn.dataset.title;
+						  removeSubscription(titleToRemove);
+						});
+					  }
+					subDiv.appendChild(card);
+				  });
+				})
+				.catch(err => {
+				  console.error("❌ Error loading subscriptions:", err);
+				  document.getElementById('subscription-area').innerHTML +=
+					"<p style='color:red;'>Failed to load subscriptions.</p>";
+				});
+			}
+
+
+
+    function removeSubscription(title) {
+	  const email = new URLSearchParams(window.location.search).get("email");
+
+	  if (!email) {
+		alert("❌ Email is missing from the URL. Cannot remove subscription.");
+		return;
+	  }
+
+	  fetch("https://0qc0cwrzr6.execute-api.us-east-1.amazonaws.com/Prod/remove-subscription", {
+		method: 'POST',
+		headers: {
+		  'Content-Type': 'application/json'
+		},
+		body: JSON.stringify({ email, title })
+	  })
+	  .then(res => {
+		if (!res.ok) {
+		  throw new Error(`HTTP ${res.status}`);
+		}
+		return res.json();
+	  })
+	  .then(result => {
+		if (result.message === 'Subscription removed') {
+		  alert(`✅ Unsubscribed from "${title}"`);
+		  loadSubscriptions(); // Reload updated subscriptions
+		} else {
+		  alert(result.message || "❌ Failed to unsubscribe.");
+		}
+	  })
+	  .catch(err => {
+		console.error("❌ Failed to remove subscription:", err);
+		alert("❌ Error occurred while removing subscription. Check console for details.");
+	  });
+	}
+
+
+
+    window.addEventListener("load", loadSubscriptions);
+  </script>
+
+</body>
+</html>
+
